@@ -82,7 +82,7 @@ xtinfluence y z,    ///
 	sav("xtinfluence_scatter")
 		
 ** heat plot
-xtdiagnostics y z, 	///
+xtinfluence y z, 	///
 		fig(heat) keylabels(all) color(RdBu, reverse)  								   ///
 		xlabel(5(10)100, angle(h) labsize(small)) xmtick(##10) xmlabel(##2, angle(h))  ///
 		ylabel(5(10)100, nogrid angle(h))  ymtick(##10) ymlabel(##2, angle(h)) 		   ///
