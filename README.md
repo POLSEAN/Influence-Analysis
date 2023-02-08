@@ -1,5 +1,5 @@
 # Influence-Analysis
-Method for visual detection of anomalous units in a panel data model with fixed effects
+Method for visual detection of anomalous units in panel data models with fixed effects
 
 # File Description
 
