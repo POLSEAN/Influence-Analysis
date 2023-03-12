@@ -75,7 +75,7 @@ else {
 	local cnames `r(varlist)'		
 	
 	local sizeofb: list sizeof local indepvars  
-	
+/*	
 	tempvar flag
 	gen `flag' = .
 	qui replace `flag' = cond(`depvar' == ., 0, 1)
@@ -86,7 +86,7 @@ else {
 		qui replace `flag' = cond(`i' == ., 0, 1)
 		drop if `flag' == 0
 	}
-			
+*/			
 	mata : diagnose("`depvar'","`indepvars'","`newid'","`timevar'","`touse'",`sizeofb')
 
 
