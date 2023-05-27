@@ -11,6 +11,8 @@
 * 		1.2 16Jan23: added FIGure(string) to plot values in a network manner (unit j vs unit i) using scatter plots and heat plots (the data sets are generated to use igraph in R as the nwplot does not allow to build the graphs); check if 'heatplot' is installed otherwise release an error message to ask to install it;
 * 		1.3 25Jan23 Deleted lines for creation of datasets for network analysis
 *		1.4 07Feb23	Added table that summarises output
+*		1.5 06May23 the title is not passed through the function
+*       1.6 16May23 Added !missing(M) and !missing(K) for cut-offs; added list of j with K>=p99 and M>=1
 ********************************************************************************
 cap program drop xtinfluence
  
@@ -75,18 +77,7 @@ else {
 	local cnames `r(varlist)'		
 	
 	local sizeofb: list sizeof local indepvars  
-/*	
-	tempvar flag
-	gen `flag' = .
-	qui replace `flag' = cond(`depvar' == ., 0, 1)
-	drop if `flag' == 0
-	
-	loc ncol : word count `cnames'
-	forvalues i=1/`ncol'{
-		qui replace `flag' = cond(`i' == ., 0, 1)
-		drop if `flag' == 0
-	}
-*/			
+		
 	mata : diagnose("`depvar'","`indepvars'","`newid'","`timevar'","`touse'",`sizeofb')
 
 
@@ -161,6 +152,7 @@ else {
 
 	keep i j C K cC M
 
+	qui replace K = 1 if i==j
 	sum C K cC M
 
 	** cut-off values
@@ -177,15 +169,21 @@ else {
 	loc n_c2 = r(r)
 	loc l_c2 = r(levels)
 	
-	qui levelsof i if M>=1
+	qui levelsof i if M>=1 & !missing(M)
 	loc n_m = r(r)
 	loc l_m = r(levels)	
+	qui levelsof j if M>=1 & !missing(M)
+	loc nj_m = r(r)
+	loc lj_m = r(levels)	
 	
 	qui sum K, det
 	loc k_p99 = r(p99)
-	qui levelsof i if K>=`k_p99'
+	qui levelsof i if K>=`k_p99' & !missing(M)
 	loc n_k = r(r)
 	loc l_k = r(levels)
+	qui levelsof j if K>=`k_p99' & !missing(M)
+	loc n_kj = r(r)
+	loc l_kj = r(levels)
 	
 	di as txt "__________________________________________________"
 	di as txt " 		 Influence analysis						 "	
@@ -204,9 +202,15 @@ else {
 	di as txt " i with K >= p99 "
 	di as txt "  - Count : " `n_k'
 	di as txt "  - List  : `l_k'"
+	di as txt " j with K >= p99 "
+	di as txt "  - Count : " `nj_k'
+	di as txt "  - List  : `lj_k'"	
 	di as txt " i with M >= 1 "
 	di as txt "  - Count : " `n_m'
 	di as txt "  - List  : `l_m'"	
+	di as txt " j with M >= 1 "
+	di as txt "  - Count : " `nj_m'
+	di as txt "  - List  : `lj_m'"	
 	di as txt "__________________________________________________"			
 		
 	save "`newsaving'_adj_mtx", replace
@@ -275,13 +279,13 @@ preserve
 					title("Conditional influence", size(medsmall))				   ///
 					saving("`newsaving'_cC.gph", replace)
 
-
+				//qui gen lnK = ln(K)
 				heatplot K j i, `options' 										   ///
 					xtitle("Unit i", size(medsmall))  							   ///
 					ytitle("Unit j", size(medsmall))  							   /// 
 					title("Joint Effects", size(medsmall)) 						   ///
 					saving("`newsaving'_K.gph", replace)
-
+				//qui drop lnK
 					
 				heatplot M j i, `options' 										   ///
 					xtitle("Unit i", size(medsmall))  							   ///
@@ -292,7 +296,7 @@ preserve
 			}
 				
 			loc plots "`newsaving'_C.gph `newsaving'_K.gph `newsaving'_cC.gph `newsaving'_M.gph"
-			graph combine `plots', iscale(.5) cols(2) 
+			graph combine `plots', iscale(.5) cols(2) `title'
 			graph export "`newsaving'.pdf", replace	
 restore
 
@@ -421,15 +425,18 @@ void diagnose(string scalar depvar,
 						
 				bij = (bi[.,i] - iXX_wg *(Xi'*iMi*Hij+Xj')*invsym(Mj-Hij'*iMi*Hij)*(Hij'*iMi*ui+uj))
 									
-				C[i,j] = (beta-bij)'*quadcross(X_wg,X_wg)*(beta-bij)/(s2*k0)
-				cC[i,j] = (bj-bij)'*quadcross(Xij,Xij)*(bj-bij)/(s2*k0) 	
+				C[i,j]  = (bij-beta)'*quadcross(X_wg,X_wg)*(bij-beta)/(s2*k0)
+				cC[i,j] = (bij-bj)'*quadcross(Xij,Xij)*(bij-bj)/(s2*k0) 	
+				
+				K[i,j] = C[i,j]/C[i,i]
+				M[i,j] = cC[i,j]/C[i,i]
 				}	
 			}			
 		}
 		
-		diagC = diagonal(C)
-		K = C:/diagC  
-		M = cC:/diagC 		
+		//diagC = diagonal(C)
+		//K = C:/diagC  
+		//M = cC:/diagC 		
 	
 		st_matrix("r(C)",C)	
 		st_matrix("r(K)",K)

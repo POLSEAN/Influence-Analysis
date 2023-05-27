@@ -7,6 +7,7 @@
 * 		1.1 16Jan23: added PERcentile(integer 95) to allow the practitioner to choose the distributional cutoff for the average individual leverage and residual; changed cutoff
 *		1.3 07Feb23	Added table that summarises output
 *       1.4 27Feb23 Swaped order `yval' and `xval'; added `touse' in scatter and levelsof
+*		1.5 06May23 removed "if `touse'" from scatter
 *******************************************************************************
 cap program drop xtlvr2plot
 
@@ -110,7 +111,15 @@ qui{
 	loc xval = 2/`NT'
 	loc yval = (`sizeofb'+1)*`xval'  //e(df_b)
 	
-	qui drop if _lev ==. | _normres2==.
+	*qui drop if _lev ==. | _normres2==.
+		*** Leverage-vs-residual plot                                              	
+	scatter _lev _normres2, 								   ///
+				`options'										       ///
+				xline(`xval') 										   ///
+				yline(`yval')  										   ///
+				ytitle("Leverage", size(medsmall))					   ///
+				xtitle("Normalised residuals squared", size(medsmall)) 
+	
 	
 	*** Table that displays main info in terms of points
 	** GL
@@ -143,14 +152,7 @@ qui{
 	di as txt "  - List  : `l_vo'"
 	di as txt "__________________________________________________"		
 
-	*** Leverage-vs-residual plot                                              	
-	scatter _lev _normres2 if `touse', 										   ///
-				`options'										       ///
-				xline(`xval') 										   ///
-				yline(`yval')  										   ///
-				ytitle("Leverage", size(medsmall))					   ///
-				xtitle("Normalised residuals squared", size(medsmall)) 
-	
+
 end 
 
 
