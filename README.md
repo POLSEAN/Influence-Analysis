@@ -3,8 +3,8 @@ Method for visual detection of anomalous units in panel data models with fixed e
 
 # File Description
 
-  1. Influence_analysis_explainer_Polselli.pdf: Explainer of the paper **[DRAFT COMING SOON]**
-  2. presentation_Stata_Polselli.pdf: Slides presented at the 20th German Stata Conference (Berlin, 16 June 2023) with an explanation of the community-contributed commands
+  1. *Influence_analysis_explainer_Polselli.pdf*: Explainer of the paper **[DRAFT COMING SOON]**
+  2. *presentation_Stata_Polselli.pdf*: Slides presented at the 20th German Stata Conference (Berlin, 16 June 2023) with an explanation of the community-contributed commands
   
 # Access the user-written Stata commands
   1. In ado/. the .ado files for the user-written commands
