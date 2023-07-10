@@ -3,11 +3,12 @@
 *! Title: Leverage-vs-Residual Plot for Panel Data with Fixed Effects
 *! Descritption: lv2plot for panel data with fixed effects
 * Version record: 
-* 		1.0 26Oct21: first version of the program
-* 		1.1 16Jan23: added PERcentile(integer 95) to allow the practitioner to choose the distributional cutoff for the average individual leverage and residual; changed cutoff
-*		1.3 07Feb23	Added table that summarises output
-*       1.4 27Feb23 Swaped order `yval' and `xval'; added `touse' in scatter and levelsof
-*		1.5 06May23 removed "if `touse'" from scatter
+* 1.0 26Oct21: first version of the program
+* 1.1 16Jan23: added PERcentile(integer 95) to allow the practitioner to choose the distributional cutoff for the average individual leverage and residual; changed cutoff
+* 1.3 07Feb23	Added table that summarises output
+* 1.4 27Feb23 Swaped order `yval' and `xval'; added `touse' in scatter and levelsof
+* 1.5 06May23 removed "if `touse'" from scatter
+* 1.6 06July23 the graph displays `panelvar' instead of `newid'; add variable `newid' to avoid confusion when ID number differs; missing obs are removed and then `newid' is generated; added line to remove units observed in one period
 *******************************************************************************
 cap program drop xtlvr2plot
 
@@ -15,7 +16,7 @@ program define xtlvr2plot, rclass
 
 	version 13	
 
-	syntax varlist(min=2 fv ts) [if] [in] [, * ]		
+	syntax varlist(min=1 fv ts) [if] [in] [, * ]		
 	
 	_get_gropts , graphopts(`options') getallowed(plot addplot)
 	local options `"`s(graphopts)'"'
@@ -37,10 +38,6 @@ program define xtlvr2plot, rclass
 	if "`timevar'"=="." local timevar = ""	// for unbalanced panel
 	local balance = r(balanced)				
 	
-	tempvar newid
-	by `panelvar': gen `newid'=1 if _n==1
-	replace `newid' = sum(`newid') `if' `in' `touse'
-	
 	qui sum `panelvar' `if' `in' `touse'
 	loc NT = r(N)
 	
@@ -61,6 +58,36 @@ program define xtlvr2plot, rclass
 	
 	local sizeofb: list sizeof local indepvars  	
 	
+	**Remove individuals with Ti=1
+	tempvar Ti_remove
+	tempname Ti_removeis1
+	qui bysort `panelvar': gen `Ti_remove' = _N if `touse'
+	
+	qui count if (`Ti_remove'==1 & `touse')			
+	scalar `Ti_removeis1' = r(N)
+	if `Ti_removeis1'>0 {
+		di as text "{bf:Warning}: " `Ti_removeis1' " units with Ti=1 have been excluded"
+	}
+	
+	qui replace `Ti_remove'=. if (`Ti_remove'==1 & `touse')
+	markout `touse' `Ti_remove'
+
+	**Remove individuals with missing yvar and xvars
+	tempvar missing_obs
+	tempname missing_obs1
+	
+	**Parse indepvars
+	forvalues i = 1/`sizeofb' {
+		loc indepvar: word `i' of `indepvars'
+		loc xmissing `xmissing' | `indepvar' ==. 
+	}		
+	loc missing_vars `" `depvar'==. `xmissing' "'
+	qui bys `panelvar': gen `missing_obs' = cond(`missing_vars',1,0) if `touse'
+	
+	tempvar newid	
+	sort `panelvar' `missing_obs'
+	egen `newid' = group(`panelvar') if `missing_obs' == 0 //`if' `in' `touse' 
+		
 	mata: lev2res("`depvar'","`indepvars'","`newid'","`timevar'","`touse'", `sizeofb')
 
 	sca  hbar = r(hbar)
@@ -79,10 +106,9 @@ qui{
 		keep  _lev _normres2
 		
 		loc Nc = `= rowsof(r(Hibar))'
-		gen `panelvar' =.	//for reshape long
+		gen `newid' =.	               //for reshape long
 		
-		**rename cols
-		*ret li
+		**Rename cols
 		matrix Hibar = r(Hibar)[1..`Nc',1]
 		matrix Uibar = r(Uibar)[1..`Nc',1]
 
@@ -90,18 +116,18 @@ qui{
 		matname Uibar Uibar, col(1) explicit		
 		
 		forvalues i = 1/`Nc' {
-			replace `panelvar' = `i'  in `i'				
+			replace `newid' = `i'  in `i'				
 			replace _lev = Hibar[`i',1] in `i'
 			replace _normres2 = Uibar[`i',1] in `i'	
 		}
 
-		drop if `panelvar' ==.
+		drop if `newid' ==.
 		save lev2res.dta, replace	
 				
 	restore
 		
-		sort `panelvar'
-		merge m:1 `panelvar' using lev2res
+		sort `newid' 
+		merge m:1 `newid' using lev2res.dta 
 		
 		drop _merge
 		cap erase lev2res.dta
@@ -110,10 +136,9 @@ qui{
 	*** Cut-off values
 	loc xval = 2/`NT'
 	loc yval = (`sizeofb'+1)*`xval'  //e(df_b)
-	
-	*qui drop if _lev ==. | _normres2==.
-		*** Leverage-vs-residual plot                                              	
-	scatter _lev _normres2, 								   ///
+		
+	*** Leverage-vs-residual plot                                              	
+	scatter _lev _normres2, 								           ///
 				`options'										       ///
 				xline(`xval') 										   ///
 				yline(`yval')  										   ///
