@@ -4,15 +4,17 @@
 *! Description: Influence analysis for panel data displaying the measures and effects of unit j against unit i. 
 *! The size of the symbols is proportional to the magnitude of the calculated measures.
 *  Version records:
-* 		1.0 21Mar22: first version of the program; deals w/missing vars using same method used in xtreg
-* 		1.1 21Jul22: added lines to construct adjacency matrix and relative .dta;
-*					   [added colors]
-*					   removed 2D (measure-unit) scatter plots with multiple cutoffs
-* 		1.2 16Jan23: added FIGure(string) to plot values in a network manner (unit j vs unit i) using scatter plots and heat plots (the data sets are generated to use igraph in R as the nwplot does not allow to build the graphs); check if 'heatplot' is installed otherwise release an error message to ask to install it;
-* 		1.3 25Jan23 Deleted lines for creation of datasets for network analysis
-*		1.4 07Feb23	Added table that summarises output
-*		1.5 06May23 the title is not passed through the function
-*       1.6 16May23 Added !missing(M) and !missing(K) for cut-offs; added list of j with K>=p99 and M>=1
+*1.0 21Mar22: first version of the program; deals w/missing vars using same method used in xtreg
+*1.1 21Jul22: added lines to construct adjacency matrix and relative .dta;
+* [added colors]
+* removed 2D (measure-unit) scatter plots with multiple cutoffs
+*1.2 16Jan23: added FIGure(string) to plot values in a network manner (unit j vs unit i) using scatter plots and heat plots (the data sets are generated to use igraph in R as the nwplot does not allow to build the graphs); check if 'heatplot' is installed otherwise release an error message to ask to install it;
+*1.3 25Jan23 Deleted lines for creation of datasets for network analysis
+*1.4 07Feb23	Added table that summarises output
+*1.5 06May23 the title is not passed through the function
+*1.6 16May23 Added !missing(M) and !missing(K) for cut-offs; added list of j with K>=p99 and M>=1
+*1.7 21Jul23 Added newid next to oldid; modified `panel prep' following xtlvr2plot v.1.6. 
+*To do: add `preserveid' option, and add title of combined graphs.
 ********************************************************************************
 cap program drop xtinfluence
  
@@ -42,43 +44,72 @@ else {
 	//tokenize saving
     tokenize "`saving'", parse("("")")	
 	loc newsaving "`3'"
-	loc title "`title'"
+	*loc title "`title'"
 	
-*****************************************
-********* COLLECT KEY INFO  *************
-********* Panel preparation *************	
-*****************************************		
- 	qui xtset 								// issues error (459) if panel not set
-	local panelvar  = r(panelvar)				
-	local timevar = r(timevar)				
-	if "`timevar'"=="." local timevar = ""	//unbalanced panel
+	*****************************************
+	********* COLLECT KEY INFO  *************
+	********* Panel preparation *************	
+	*****************************************		
+ 
+	**Check if xtset and collect panelvar and timevar
+	qui xtset 								// issues error(459) if panel not set
+	local panelvar = r(panelvar)				
+	local timevar  = r(timevar)				
+	loc Tbar = r(Tbar)
+	if "`timevar'"=="." local timevar = ""	// for unbalanced panel
 	local balance = r(balanced)				
-	
-	tempvar newid
-	by `panelvar': gen `newid'=1 if _n==1
-	replace `newid' = sum(`newid') `if' `in' `touse'
 	
 	qui sum `panelvar' `if' `in' `touse'
 	loc NT = r(N)
 	
-	// mark sample
 	marksample touse
 	markout `touse' `varlist'	
+
+	tokenize "`saving'", parse("()")	
+	loc newsaving "`3'"
 	
-	// varlist: store into depvar indepvars
-	gettoken depvar indepvars : varlist
+	gettoken depvar indepvars: varlist
 	tokenize `indepvars'
 		
-	// varlist: store into depvar indepvars
 	_fv_check_depvar `depvar'
 	_rmcoll `indepvars' if 	`touse'		
 	loc indepvars_nocoll `r(varlist)'		
 	fvexpand `indepvars_nocoll' 
 	local cnames `r(varlist)'		
 	
-	local sizeofb: list sizeof local indepvars  
+	local sizeofb: list sizeof local indepvars  	
+	
+	**Remove individuals with Ti=1
+	tempvar Ti_remove
+	tempname Ti_removeis1
+	qui bysort `panelvar': gen `Ti_remove' = _N if `touse'
+	
+	qui count if (`Ti_remove'==1 & `touse')			
+	scalar `Ti_removeis1' = r(N)
+	if `Ti_removeis1'>0 {
+		di as text "{bf:Warning}: " `Ti_removeis1' " units with Ti=1 have been excluded"
+	}
+	
+	qui replace `Ti_remove'=. if (`Ti_remove'==1 & `touse')
+	markout `touse' `Ti_remove'
+
+	**Remove individuals with missing yvar and xvars
+	tempvar missing_obs
+	tempname missing_obs1
+	
+	**Parse indepvars
+	forvalues i = 1/`sizeofb' {
+		loc indepvar: word `i' of `indepvars'
+		loc xmissing `xmissing' | `indepvar' ==. 
+	}		
+	loc missing_vars `" `depvar'==. `xmissing' "'
+	qui bys `panelvar': gen `missing_obs' = cond(`missing_vars',1,0) if `touse'
+	
+	*tempvar newid	
+	sort `panelvar' `missing_obs'
+	egen _newid = group(`panelvar') if `missing_obs' == 0 
 		
-	mata : diagnose("`depvar'","`indepvars'","`newid'","`timevar'","`touse'",`sizeofb')
+	mata : diagnose("`depvar'","`indepvars'","_newid","`timevar'","`touse'",`sizeofb')
 
 
 ********************************************************************************
@@ -211,14 +242,13 @@ else {
 	di as txt " j with M >= 1 "
 	di as txt "  - Count : " `nj_m'
 	di as txt "  - List  : `lj_m'"	
-	di as txt "__________________________________________________"			
-		
+	di as txt "__________________________________________________"				
 	save "`newsaving'_adj_mtx", replace
 		
 	restore			
 }
 
-preserve
+	preserve
 		**Generate FIGure(string)
 		u "`newsaving'_adj_mtx", clear
 
