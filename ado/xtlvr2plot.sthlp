@@ -76,7 +76,7 @@ An example of the use of the command using simulated data:
 {cmd:xtlvr2plot} is not an official Stata command. It is a free contribution to the research community, like a paper. Please cite it as such:
 
 {pstd}
-Polselli, A. (2023). {cmd:xtlvr2plot} (Version 1.7) [Computer software]. GitHub. {browse "https://github.com/POLSEAN/Influence-Analysis": https://github.com/POLSEAN/Influence-Analysis}.
+Polselli, A. (2023). {cmd:xtlvr2plot} (Version 1.8) [Computer software]. GitHub. {browse "https://github.com/POLSEAN/Influence-Analysis": https://github.com/POLSEAN/Influence-Analysis}.
 
 {title:References}
 
